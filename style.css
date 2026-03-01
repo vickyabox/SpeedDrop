@@ -1,0 +1,8 @@
+body { margin:0; font-family:Arial; background:#111; color:#fff; }
+header { background:#0f62fe; padding:12px; text-align:center; font-size:18px; }
+#map { height:50vh; }
+.panel { padding:10px; }
+input { width:70%; padding:8px; }
+button { padding:8px; background:#0f62fe; color:#fff; border:none; }
+ul { list-style:none; padding:0; }
+li { padding:6px 0; border-bottom:1px solid #333; }
