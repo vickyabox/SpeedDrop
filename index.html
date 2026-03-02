@@ -10,37 +10,44 @@
 <script src="https://unpkg.com/html5-qrcode/minified/html5-qrcode.min.js"></script>
 
 <style>
-body { margin:0; font-family:Arial; background:#0f172a; color:white; }
-#map { height:100vh; }
+body {
+  margin:0;
+  font-family:Arial;
+  background:#0f172a;
+  color:white;
+}
+
+#map {
+  height:60vh;
+  width:100%;
+}
+
 .panel {
-position:fixed;
-bottom:0;
-left:0;
-right:0;
-background:#111827;
-padding:10px;
-border-top-left-radius:15px;
-border-top-right-radius:15px;
+  background:#111827;
+  padding:15px;
 }
+
 button {
-padding:8px;
-margin:5px 0;
-width:100%;
-background:#2563eb;
-border:none;
-color:white;
-border-radius:6px;
+  padding:10px;
+  margin-top:8px;
+  width:100%;
+  background:#2563eb;
+  border:none;
+  color:white;
+  border-radius:6px;
+  font-size:14px;
 }
+
 input {
-width:100%;
-padding:8px;
-margin:5px 0;
-border-radius:6px;
-border:none;
+  width:100%;
+  padding:10px;
+  margin-top:8px;
+  border-radius:6px;
+  border:none;
 }
-.small-btn {
-width:48%;
-display:inline-block;
+
+#reader {
+  margin-top:10px;
 }
 </style>
 </head>
@@ -49,13 +56,15 @@ display:inline-block;
 <div id="map"></div>
 
 <div class="panel">
-<input type="text" id="personName" placeholder="Person Name">
+<input type="text" id="personName" placeholder="Scan or Enter Name">
+
 <button onclick="startScan()">Scan Barcode</button>
-<button onclick="lockLocation()" class="small-btn">Lock Location</button>
-<button onclick="unlockLocation()" class="small-btn">Unlock</button>
+<button onclick="lockLocation()">Lock Location</button>
+<button onclick="unlockLocation()">Unlock Location</button>
 <button onclick="openGoogleNav()">Open in Google Maps</button>
-<div id="distance"></div>
-<div id="reader" style="width:100%"></div>
+
+<div id="distance" style="margin-top:10px;"></div>
+<div id="reader"></div>
 </div>
 
 <script src="app.js"></script>
