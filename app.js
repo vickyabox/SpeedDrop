@@ -1,7 +1,4 @@
-let map = L.map('map').setView([20.5937, 78.9629], 5);
-let parcels = [];
-let markers = [];
-
+let map = L.map('map').setView([20.5937,78.9629],5);
 let normal = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
 let satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}');
 normal.addTo(map);
@@ -11,35 +8,81 @@ L.control.layers({
   "Satellite": satellite
 }).addTo(map);
 
-navigator.geolocation.watchPosition(position => {
-  let lat = position.coords.latitude;
-  let lon = position.coords.longitude;
-  map.setView([lat, lon], 15);
-  L.marker([lat, lon]).addTo(map).bindPopup("You are here").openPopup();
+let currentLat = null;
+let currentLon = null;
+let savedData = JSON.parse(localStorage.getItem("speeddrop")) || {};
+let marker = null;
+
+navigator.geolocation.watchPosition(pos=>{
+  currentLat = pos.coords.latitude;
+  currentLon = pos.coords.longitude;
+  map.setView([currentLat,currentLon],16);
 });
 
-function addParcel() {
-  let address = document.getElementById("address").value;
-  if(!address) return;
-
-  fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${address}`)
-  .then(res => res.json())
-  .then(data => {
-    if(data.length === 0) return alert("Address not found");
-
-    let lat = parseFloat(data[0].lat);
-    let lon = parseFloat(data[0].lon);
-
-    let number = parcels.length + 1;
-    parcels.push({address, lat, lon});
-
-    let marker = L.marker([lat, lon]).addTo(map)
-      .bindPopup(number + ". " + address);
-    markers.push(marker);
-
-    document.getElementById("parcelList").innerHTML +=
-      `<li>${number}. ${address}</li>`;
-
-    map.setView([lat, lon], 15);
+function startScan(){
+  const qr = new Html5Qrcode("reader");
+  qr.start({ facingMode:"environment" }, { fps:10, qrbox:250 },
+  barcode=>{
+    document.getElementById("personName").value = barcode;
+    qr.stop();
+    loadSaved(barcode);
   });
+}
+
+function lockLocation(){
+  let name = document.getElementById("personName").value;
+  if(!name || !currentLat) return alert("Scan or enter name first");
+
+  savedData[name] = {lat:currentLat, lon:currentLon};
+  localStorage.setItem("speeddrop", JSON.stringify(savedData));
+  alert("Location Locked");
+  showMarker(currentLat,currentLon);
+}
+
+function unlockLocation(){
+  let name = document.getElementById("personName").value;
+  delete savedData[name];
+  localStorage.setItem("speeddrop", JSON.stringify(savedData));
+  alert("Unlocked");
+}
+
+function loadSaved(name){
+  if(savedData[name]){
+    let lat = savedData[name].lat;
+    let lon = savedData[name].lon;
+    showMarker(lat,lon);
+    calculateDistance(lat,lon);
+  }
+}
+
+function showMarker(lat,lon){
+  if(marker) map.removeLayer(marker);
+  marker = L.marker([lat,lon]).addTo(map);
+  map.setView([lat,lon],18);
+}
+
+function calculateDistance(lat,lon){
+  let R = 6371e3;
+  let φ1 = currentLat*Math.PI/180;
+  let φ2 = lat*Math.PI/180;
+  let Δφ = (lat-currentLat)*Math.PI/180;
+  let Δλ = (lon-currentLon)*Math.PI/180;
+
+  let a = Math.sin(Δφ/2)*Math.sin(Δφ/2) +
+  Math.cos(φ1)*Math.cos(φ2) *
+  Math.sin(Δλ/2)*Math.sin(Δλ/2);
+  let c = 2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+
+  let d = R*c;
+  document.getElementById("distance").innerText =
+  "Distance: "+Math.round(d)+" meters";
+}
+
+function openGoogleNav(){
+  let name = document.getElementById("personName").value;
+  if(savedData[name]){
+    let lat = savedData[name].lat;
+    let lon = savedData[name].lon;
+    window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}`);
+  }
 }
