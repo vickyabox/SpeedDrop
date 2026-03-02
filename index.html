@@ -1,27 +1,63 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SpeedDrop</title>
-  <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-  <link rel="stylesheet" href="style.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SpeedDrop</title>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://unpkg.com/html5-qrcode/minified/html5-qrcode.min.js"></script>
+
+<style>
+body { margin:0; font-family:Arial; background:#0f172a; color:white; }
+#map { height:100vh; }
+.panel {
+position:fixed;
+bottom:0;
+left:0;
+right:0;
+background:#111827;
+padding:10px;
+border-top-left-radius:15px;
+border-top-right-radius:15px;
+}
+button {
+padding:8px;
+margin:5px 0;
+width:100%;
+background:#2563eb;
+border:none;
+color:white;
+border-radius:6px;
+}
+input {
+width:100%;
+padding:8px;
+margin:5px 0;
+border-radius:6px;
+border:none;
+}
+.small-btn {
+width:48%;
+display:inline-block;
+}
+</style>
 </head>
 <body>
-
-<header>SpeedDrop 🚀</header>
 
 <div id="map"></div>
 
 <div class="panel">
-  <input type="text" id="address" placeholder="Enter Address">
-  <button onclick="addParcel()">Add Parcel</button>
-  <ul id="parcelList"></ul>
+<input type="text" id="personName" placeholder="Person Name">
+<button onclick="startScan()">Scan Barcode</button>
+<button onclick="lockLocation()" class="small-btn">Lock Location</button>
+<button onclick="unlockLocation()" class="small-btn">Unlock</button>
+<button onclick="openGoogleNav()">Open in Google Maps</button>
+<div id="distance"></div>
+<div id="reader" style="width:100%"></div>
 </div>
 
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script src="app.js"></script>
-
 </body>
 </html>
