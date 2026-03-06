@@ -1,72 +1,280 @@
-<!DOCTYPE html>
-<html>
+<!DOCTYPE html><html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SpeedDrop</title>
-
-<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<title>SpeedDrop</title><link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-<script src="https://unpkg.com/html5-qrcode/minified/html5-qrcode.min.js"></script>
-
-<style>
-body {
-  margin:0;
-  font-family:Arial;
-  background:#0f172a;
-  color:white;
+<script src="https://unpkg.com/html5-qrcode"></script><style>
+body{
+margin:0;
+font-family:Arial;
+background:#0f172a;
+color:white;
 }
 
-#map {
-  height:60vh;
-  width:100%;
+#map{
+height:50vh;
 }
 
-.panel {
-  background:#111827;
-  padding:15px;
+.panel{
+background:#111827;
+padding:12px;
 }
 
-button {
-  padding:10px;
-  margin-top:8px;
-  width:100%;
-  background:#2563eb;
-  border:none;
-  color:white;
-  border-radius:6px;
-  font-size:14px;
+input{
+width:100%;
+padding:10px;
+margin:6px 0;
+border:none;
+border-radius:6px;
 }
 
-input {
-  width:100%;
-  padding:10px;
-  margin-top:8px;
-  border-radius:6px;
-  border:none;
+button{
+width:100%;
+padding:10px;
+margin:6px 0;
+border:none;
+background:#2563eb;
+color:white;
+border-radius:6px;
 }
 
-#reader {
-  margin-top:10px;
+#reader{
+margin-top:10px;
 }
-</style>
-</head>
-<body>
 
-<div id="map"></div>
+.parcel{
+background:#1f2937;
+padding:8px;
+margin:4px 0;
+border-radius:6px;
+}
 
-<div class="panel">
-<input type="text" id="personName" placeholder="Scan or Enter Name">
+img{
+width:100%;
+margin-top:10px;
+border-radius:6px;
+}
 
-<button onclick="startScan()">Scan Barcode</button>
+video{
+width:100%;
+display:none;
+}
+</style></head><body><div id="map"></div><div class="panel"><input id="name" placeholder="Customer Name / Scan Code">
+<input id="address" placeholder="Address"><button onclick="startScan()">Scan Parcel</button>
+<button onclick="addParcel()">Add Parcel</button>
 <button onclick="lockLocation()">Lock Location</button>
-<button onclick="unlockLocation()">Unlock Location</button>
-<button onclick="openGoogleNav()">Open in Google Maps</button>
+<button onclick="checkSaved()">Check Saved Location</button>
+<button onclick="openGoogle()">Open Google Maps</button>
+<button onclick="capturePhoto()">Capture Gate Photo</button>
 
-<div id="distance" style="margin-top:10px;"></div>
-<div id="reader"></div>
-</div>
+<div id="reader"></div><div id="parcelList"></div>
+<div id="distance"></div><video id="camera" autoplay></video>
+<canvas id="canvas" style="display:none"></canvas>
+<img id="preview">
 
-<script src="app.js"></script>
-</body>
+</div><script>
+
+let map=L.map('map').setView([20.5937,78.9629],5);
+
+L.tileLayer(
+'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+).addTo(map);
+
+let currentLat,currentLon;
+let marker;
+
+navigator.geolocation.watchPosition(pos=>{
+
+currentLat=pos.coords.latitude;
+currentLon=pos.coords.longitude;
+
+map.setView([currentLat,currentLon],16);
+
+});
+
+function startScan(){
+
+const scanner=new Html5Qrcode("reader");
+
+scanner.start(
+{facingMode:"environment"},
+{fps:10,qrbox:250},
+(decodedText)=>{
+
+document.getElementById("name").value=decodedText;
+
+scanner.stop();
+
+}
+);
+
+}
+
+function addParcel(){
+
+let name=document.getElementById("name").value;
+let address=document.getElementById("address").value;
+
+let parcel={name,address};
+
+let list=JSON.parse(localStorage.getItem("parcels"))||[];
+
+list.push(parcel);
+
+localStorage.setItem("parcels",JSON.stringify(list));
+
+renderList();
+
+}
+
+function renderList(){
+
+let list=JSON.parse(localStorage.getItem("parcels"))||[];
+
+let html="";
+
+list.forEach(p=>{
+
+html+=`<div class="parcel">${p.name}<br>${p.address}</div>`;
+
+});
+
+document.getElementById("parcelList").innerHTML=html;
+
+}
+
+function lockLocation(){
+
+let name=document.getElementById("name").value;
+let address=document.getElementById("address").value;
+
+let data={
+lat:currentLat,
+lon:currentLon
+};
+
+localStorage.setItem(name+address,JSON.stringify(data));
+
+alert("Location Locked");
+
+}
+
+function checkSaved(){
+
+let name=document.getElementById("name").value;
+let address=document.getElementById("address").value;
+
+let data=localStorage.getItem(name+address);
+
+if(data){
+
+let d=JSON.parse(data);
+
+showMarker(d.lat,d.lon);
+
+map.setView([d.lat,d.lon],18);
+
+calcDistance(d.lat,d.lon);
+
+}else{
+
+alert("No saved location");
+
+}
+
+}
+
+function showMarker(lat,lon){
+
+if(marker) map.removeLayer(marker);
+
+marker=L.marker([lat,lon]).addTo(map);
+
+}
+
+function calcDistance(lat,lon){
+
+let R=6371e3;
+
+let φ1=currentLat*Math.PI/180;
+let φ2=lat*Math.PI/180;
+
+let Δφ=(lat-currentLat)*Math.PI/180;
+let Δλ=(lon-currentLon)*Math.PI/180;
+
+let a=Math.sin(Δφ/2)*Math.sin(Δφ/2)+
+Math.cos(φ1)*Math.cos(φ2)*
+Math.sin(Δλ/2)*Math.sin(Δλ/2);
+
+let c=2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+
+let d=R*c;
+
+document.getElementById("distance").innerText=
+"Distance: "+Math.round(d)+" meters";
+
+}
+
+function openGoogle(){
+
+let name=document.getElementById("name").value;
+let address=document.getElementById("address").value;
+
+let data=localStorage.getItem(name+address);
+
+let lat=currentLat;
+let lon=currentLon;
+
+if(data){
+
+let d=JSON.parse(data);
+
+lat=d.lat;
+lon=d.lon;
+
+}
+
+window.open(
+`https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}`
+);
+
+}
+
+async function capturePhoto(){
+
+let video=document.getElementById("camera");
+
+video.style.display="block";
+
+let stream=await navigator.mediaDevices.getUserMedia({video:true});
+
+video.srcObject=stream;
+
+setTimeout(()=>{
+
+let canvas=document.getElementById("canvas");
+
+canvas.width=video.videoWidth;
+canvas.height=video.videoHeight;
+
+let ctx=canvas.getContext("2d");
+
+ctx.drawImage(video,0,0);
+
+let img=canvas.toDataURL("image/png");
+
+document.getElementById("preview").src=img;
+
+stream.getTracks().forEach(t=>t.stop());
+
+video.style.display="none";
+
+},2500);
+
+}
+
+renderList();
+
+</script></body>
 </html>
