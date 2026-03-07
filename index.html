@@ -5,27 +5,52 @@
 <title>SpeedDrop</title><link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script src="https://unpkg.com/html5-qrcode"></script><style>
-body{margin:0;font-family:Arial;background:#0f172a;color:white}
 
-#map{height:50vh}
+body{
+margin:0;
+font-family:Arial;
+background:#0f172a;
+color:white;
+}
 
-.panel{background:#111827;padding:12px}
+#map{
+height:45vh;
+}
+
+.panel{
+background:#111827;
+padding:12px;
+}
 
 input,button{
 width:100%;
 padding:10px;
-margin:6px 0;
+margin:5px 0;
 border:none;
-border-radius:6px
+border-radius:6px;
 }
 
-button{background:#2563eb;color:white}
+button{
+background:#2563eb;
+color:white;
+}
 
 .parcel{
 background:#1f2937;
-padding:8px;
-margin:4px 0;
-border-radius:6px
+padding:10px;
+margin:6px 0;
+border-radius:8px;
+}
+
+.parcel img{
+width:100%;
+border-radius:6px;
+margin-top:6px;
+}
+
+.btnSmall{
+width:48%;
+display:inline-block;
 }
 
 #floatingRoute{
@@ -38,49 +63,208 @@ overflow:auto;
 background:#111827;
 padding:10px;
 border-radius:8px;
-box-shadow:0 0 10px rgba(0,0,0,0.5)
 }
 
-img{width:100%;margin-top:10px;border-radius:6px}
-video{display:none;width:100%}
 </style></head><body><div id="map"></div><div id="floatingRoute">
 <b>Today's Route</b>
 <div id="progress"></div>
 <div id="todayRoute"></div>
-</div><div class="panel"><input id="name" placeholder="Customer Name / Scan">
+</div><div class="panel"><input id="name" placeholder="Customer Name">
 <input id="address" placeholder="Address">
-<input id="notes" placeholder="Notes (gate color, landmark etc)"><button onclick="startScan()">Scan Parcel</button>
+<input id="notes" placeholder="Notes"><button onclick="startScan()">Scan Parcel</button>
 <button onclick="addParcel()">Add Parcel</button>
-<button onclick="lockLocation()">Lock Location</button>
-<button onclick="checkSaved()">Check Saved</button>
-<button onclick="openGoogle()">Navigate (Google Maps)</button>
-<button onclick="capturePhoto()">Gate Photo</button>
+
 <button onclick="exportData()">Export Data</button>
+<button onclick="document.getElementById('importFile').click()">Import Data</button>
 
-<input type="file" onchange="importData(this)"><div id="reader"></div>
-<div id="parcelList"></div>
-<div id="distance"></div><video id="camera" autoplay></video>
-<canvas id="canvas" style="display:none"></canvas>
-<img id="preview">
-
-</div><script>
+<input type="file" id="importFile" style="display:none" onchange="importData(this)"><div id="reader"></div>
+<div id="parcelList"></div></div><script>
 
 let map=L.map('map').setView([20.5937,78.9629],5)
 
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png')
-.addTo(map)
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map)
 
-let currentLat,currentLon,currentAccuracy
-let marker
-let parcelMarkers=[]
-let routeLine
+let currentLat,currentLon,currentMarker
 
 navigator.geolocation.watchPosition(pos=>{
+
 currentLat=pos.coords.latitude
 currentLon=pos.coords.longitude
-currentAccuracy=pos.coords.accuracy
+
 map.setView([currentLat,currentLon],16)
+
+if(currentMarker) map.removeLayer(currentMarker)
+
+currentMarker=L.circleMarker([currentLat,currentLon],{
+radius:8,
+color:"cyan"
+}).addTo(map).bindPopup("You are here")
+
 })
+
+function getParcels(){
+return JSON.parse(localStorage.getItem("parcels"))||[]
+}
+
+function saveParcels(data){
+localStorage.setItem("parcels",JSON.stringify(data))
+}
+
+function addParcel(){
+
+let name=document.getElementById("name").value
+let address=document.getElementById("address").value
+let notes=document.getElementById("notes").value
+
+let parcel={
+name,address,notes,
+lat:currentLat,
+lon:currentLon,
+date:new Date().toDateString(),
+photo:"",
+delivered:false
+}
+
+let list=getParcels()
+list.push(parcel)
+
+saveParcels(list)
+
+renderList()
+renderToday()
+
+}
+
+function renderList(){
+
+let list=getParcels()
+let html=""
+
+list.forEach((p,i)=>{
+
+html+=`
+<div class="parcel">
+<b>${p.name}</b><br>
+${p.address}<br>
+<i>${p.notes||""}</i>
+
+${p.photo ? `<img src="${p.photo}">` : ""}
+
+<br>
+
+<button class="btnSmall" onclick="editParcel(${i})">Edit</button>
+<button class="btnSmall" onclick="deleteParcel(${i})">Delete</button>
+
+<button onclick="takePhoto(${i})">Gate Photo</button>
+<button onclick="navigate(${i})">Navigate</button>
+
+</div>
+`
+
+})
+
+document.getElementById("parcelList").innerHTML=html
+
+}
+
+function editParcel(i){
+
+let list=getParcels()
+
+let n=prompt("Name",list[i].name)
+let a=prompt("Address",list[i].address)
+let no=prompt("Notes",list[i].notes)
+
+list[i].name=n
+list[i].address=a
+list[i].notes=no
+
+saveParcels(list)
+renderList()
+
+}
+
+function deleteParcel(i){
+
+let list=getParcels()
+
+list.splice(i,1)
+
+saveParcels(list)
+
+renderList()
+renderToday()
+
+}
+
+function renderToday(){
+
+let list=getParcels()
+
+let today=new Date().toDateString()
+
+let html=""
+let total=0
+
+list.forEach(p=>{
+
+if(p.date===today){
+
+total++
+
+html+=`<div><b>${p.name}</b><br>${p.notes||""}</div>`
+
+}
+
+})
+
+document.getElementById("todayRoute").innerHTML=html
+document.getElementById("progress").innerHTML="Today Parcels: "+total
+
+}
+
+function navigate(i){
+
+let p=getParcels()[i]
+
+window.open(
+`https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lon}`
+)
+
+}
+
+async function takePhoto(i){
+
+let stream=await navigator.mediaDevices.getUserMedia({video:true})
+
+let video=document.createElement("video")
+video.srcObject=stream
+video.play()
+
+setTimeout(()=>{
+
+let canvas=document.createElement("canvas")
+canvas.width=video.videoWidth
+canvas.height=video.videoHeight
+
+let ctx=canvas.getContext("2d")
+ctx.drawImage(video,0,0)
+
+let img=canvas.toDataURL()
+
+let list=getParcels()
+
+list[i].photo=img
+
+saveParcels(list)
+
+stream.getTracks().forEach(t=>t.stop())
+
+renderList()
+
+},2000)
+
+}
 
 function startScan(){
 
@@ -96,268 +280,6 @@ scanner.stop()
 
 }
 
-function addParcel(){
-
-let name=nameInput().value
-let address=addressInput().value
-let notes=notesInput().value
-
-let parcel={
-name,address,notes,
-lat:currentLat,
-lon:currentLon,
-date:new Date().toDateString(),
-delivered:false
-}
-
-let list=getParcels()
-list.push(parcel)
-
-saveParcels(list)
-
-renderList()
-renderTodayRoute()
-drawRoute()
-
-showParcelOnMap(parcel)
-
-}
-
-function nameInput(){return document.getElementById("name")}
-function addressInput(){return document.getElementById("address")}
-function notesInput(){return document.getElementById("notes")}
-
-function getParcels(){
-return JSON.parse(localStorage.getItem("parcels"))||[]
-}
-
-function saveParcels(data){
-localStorage.setItem("parcels",JSON.stringify(data))
-}
-
-function renderList(){
-
-let list=getParcels()
-let html=""
-
-list.forEach((p,i)=>{
-
-html+=`<div class="parcel">
-<b>${p.name}</b><br>
-${p.address}<br>
-<i>${p.notes||""}</i><br>
-<button onclick="markDelivered(${i})">Delivered</button>
-</div>`
-
-})
-
-document.getElementById("parcelList").innerHTML=html
-
-}
-
-function renderTodayRoute(){
-
-let list=getParcels()
-let today=new Date().toDateString()
-
-let html=""
-let total=0
-let done=0
-
-list.forEach((p,i)=>{
-
-if(p.date===today){
-
-total++
-if(p.delivered) done++
-
-html+=`<div>
-<b>${p.name}</b><br>
-<small>${p.notes||""}</small>
-</div>`
-
-}
-
-})
-
-document.getElementById("todayRoute").innerHTML=html
-document.getElementById("progress").innerHTML=
-"Progress: "+done+" / "+total
-
-}
-
-function markDelivered(i){
-
-let list=getParcels()
-list[i].delivered=true
-saveParcels(list)
-
-renderList()
-renderTodayRoute()
-
-}
-
-function showParcelOnMap(p){
-
-let m=L.marker([p.lat,p.lon])
-.addTo(map)
-.bindPopup(p.name)
-
-parcelMarkers.push(m)
-
-}
-
-function drawRoute(){
-
-let list=getParcels()
-let today=new Date().toDateString()
-
-let coords=[]
-
-list.forEach(p=>{
-if(p.date===today){
-coords.push([p.lat,p.lon])
-}
-})
-
-if(routeLine) map.removeLayer(routeLine)
-
-if(coords.length>1){
-
-routeLine=L.polyline(coords,{color:'cyan'})
-.addTo(map)
-
-}
-
-}
-
-function lockLocation(){
-
-if(currentAccuracy>20){
-
-alert("GPS accuracy low, wait few seconds")
-return
-
-}
-
-let name=nameInput().value
-let address=addressInput().value
-
-let data={lat:currentLat,lon:currentLon}
-
-localStorage.setItem(name+address,JSON.stringify(data))
-
-alert("Location Locked")
-
-}
-
-function checkSaved(){
-
-let name=nameInput().value
-let address=addressInput().value
-
-let data=localStorage.getItem(name+address)
-
-if(data){
-
-let d=JSON.parse(data)
-
-showMarker(d.lat,d.lon)
-
-map.setView([d.lat,d.lon],18)
-
-calcDistance(d.lat,d.lon)
-
-}else{
-
-alert("No saved location")
-
-}
-
-}
-
-function showMarker(lat,lon){
-
-if(marker) map.removeLayer(marker)
-
-marker=L.marker([lat,lon]).addTo(map)
-
-}
-
-function calcDistance(lat,lon){
-
-let R=6371e3
-
-let φ1=currentLat*Math.PI/180
-let φ2=lat*Math.PI/180
-
-let Δφ=(lat-currentLat)*Math.PI/180
-let Δλ=(lon-currentLon)*Math.PI/180
-
-let a=Math.sin(Δφ/2)*Math.sin(Δφ/2)+
-Math.cos(φ1)*Math.cos(φ2)*
-Math.sin(Δλ/2)*Math.sin(Δλ/2)
-
-let c=2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a))
-let d=R*c
-
-document.getElementById("distance").innerText=
-"Distance: "+Math.round(d)+" meters"
-
-}
-
-function openGoogle(){
-
-let name=nameInput().value
-let address=addressInput().value
-
-let data=localStorage.getItem(name+address)
-
-let lat=currentLat
-let lon=currentLon
-
-if(data){
-
-let d=JSON.parse(data)
-lat=d.lat
-lon=d.lon
-
-}
-
-window.open(
-`https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}`
-)
-
-}
-
-async function capturePhoto(){
-
-let video=document.getElementById("camera")
-video.style.display="block"
-
-let stream=await navigator.mediaDevices.getUserMedia({video:true})
-video.srcObject=stream
-
-setTimeout(()=>{
-
-let canvas=document.getElementById("canvas")
-
-canvas.width=video.videoWidth
-canvas.height=video.videoHeight
-
-let ctx=canvas.getContext("2d")
-ctx.drawImage(video,0,0)
-
-let img=canvas.toDataURL("image/png")
-document.getElementById("preview").src=img
-
-stream.getTracks().forEach(t=>t.stop())
-video.style.display="none"
-
-},2500)
-
-}
-
 function exportData(){
 
 let data=localStorage.getItem("parcels")
@@ -365,6 +287,7 @@ let data=localStorage.getItem("parcels")
 let blob=new Blob([data],{type:"application/json"})
 
 let a=document.createElement("a")
+
 a.href=URL.createObjectURL(blob)
 a.download="speeddrop_backup.json"
 a.click()
@@ -381,8 +304,7 @@ reader.onload=function(){
 localStorage.setItem("parcels",reader.result)
 
 renderList()
-renderTodayRoute()
-drawRoute()
+renderToday()
 
 }
 
@@ -391,175 +313,7 @@ reader.readAsText(file)
 }
 
 renderList()
-renderTodayRoute()
-drawRoute()
-
-</script></body>
-</html>
-function addParcel(){
-
-let name=document.getElementById("name").value;
-let address=document.getElementById("address").value;
-
-let parcel={name,address};
-
-let list=JSON.parse(localStorage.getItem("parcels"))||[];
-
-list.push(parcel);
-
-localStorage.setItem("parcels",JSON.stringify(list));
-
-renderList();
-
-}
-
-function renderList(){
-
-let list=JSON.parse(localStorage.getItem("parcels"))||[];
-
-let html="";
-
-list.forEach(p=>{
-
-html+=`<div class="parcel">${p.name}<br>${p.address}</div>`;
-
-});
-
-document.getElementById("parcelList").innerHTML=html;
-
-}
-
-function lockLocation(){
-
-let name=document.getElementById("name").value;
-let address=document.getElementById("address").value;
-
-let data={
-lat:currentLat,
-lon:currentLon
-};
-
-localStorage.setItem(name+address,JSON.stringify(data));
-
-alert("Location Locked");
-
-}
-
-function checkSaved(){
-
-let name=document.getElementById("name").value;
-let address=document.getElementById("address").value;
-
-let data=localStorage.getItem(name+address);
-
-if(data){
-
-let d=JSON.parse(data);
-
-showMarker(d.lat,d.lon);
-
-map.setView([d.lat,d.lon],18);
-
-calcDistance(d.lat,d.lon);
-
-}else{
-
-alert("No saved location");
-
-}
-
-}
-
-function showMarker(lat,lon){
-
-if(marker) map.removeLayer(marker);
-
-marker=L.marker([lat,lon]).addTo(map);
-
-}
-
-function calcDistance(lat,lon){
-
-let R=6371e3;
-
-let φ1=currentLat*Math.PI/180;
-let φ2=lat*Math.PI/180;
-
-let Δφ=(lat-currentLat)*Math.PI/180;
-let Δλ=(lon-currentLon)*Math.PI/180;
-
-let a=Math.sin(Δφ/2)*Math.sin(Δφ/2)+
-Math.cos(φ1)*Math.cos(φ2)*
-Math.sin(Δλ/2)*Math.sin(Δλ/2);
-
-let c=2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
-
-let d=R*c;
-
-document.getElementById("distance").innerText=
-"Distance: "+Math.round(d)+" meters";
-
-}
-
-function openGoogle(){
-
-let name=document.getElementById("name").value;
-let address=document.getElementById("address").value;
-
-let data=localStorage.getItem(name+address);
-
-let lat=currentLat;
-let lon=currentLon;
-
-if(data){
-
-let d=JSON.parse(data);
-
-lat=d.lat;
-lon=d.lon;
-
-}
-
-window.open(
-`https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}`
-);
-
-}
-
-async function capturePhoto(){
-
-let video=document.getElementById("camera");
-
-video.style.display="block";
-
-let stream=await navigator.mediaDevices.getUserMedia({video:true});
-
-video.srcObject=stream;
-
-setTimeout(()=>{
-
-let canvas=document.getElementById("canvas");
-
-canvas.width=video.videoWidth;
-canvas.height=video.videoHeight;
-
-let ctx=canvas.getContext("2d");
-
-ctx.drawImage(video,0,0);
-
-let img=canvas.toDataURL("image/png");
-
-document.getElementById("preview").src=img;
-
-stream.getTracks().forEach(t=>t.stop());
-
-video.style.display="none";
-
-},2500);
-
-}
-
-renderList();
+renderToday()
 
 </script></body>
 </html>
