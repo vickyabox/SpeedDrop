@@ -5,112 +5,397 @@
 <title>SpeedDrop</title><link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script src="https://unpkg.com/html5-qrcode"></script><style>
-body{
-margin:0;
-font-family:Arial;
-background:#0f172a;
-color:white;
-}
+body{margin:0;font-family:Arial;background:#0f172a;color:white}
 
-#map{
-height:50vh;
-}
+#map{height:50vh}
 
-.panel{
-background:#111827;
-padding:12px;
-}
+.panel{background:#111827;padding:12px}
 
-input{
+input,button{
 width:100%;
 padding:10px;
 margin:6px 0;
 border:none;
-border-radius:6px;
+border-radius:6px
 }
 
-button{
-width:100%;
-padding:10px;
-margin:6px 0;
-border:none;
-background:#2563eb;
-color:white;
-border-radius:6px;
-}
-
-#reader{
-margin-top:10px;
-}
+button{background:#2563eb;color:white}
 
 .parcel{
 background:#1f2937;
 padding:8px;
 margin:4px 0;
-border-radius:6px;
+border-radius:6px
 }
 
-img{
-width:100%;
-margin-top:10px;
-border-radius:6px;
+#floatingRoute{
+position:fixed;
+top:10px;
+right:10px;
+width:220px;
+max-height:350px;
+overflow:auto;
+background:#111827;
+padding:10px;
+border-radius:8px;
+box-shadow:0 0 10px rgba(0,0,0,0.5)
 }
 
-video{
-width:100%;
-display:none;
-}
-</style></head><body><div id="map"></div><div class="panel"><input id="name" placeholder="Customer Name / Scan Code">
-<input id="address" placeholder="Address"><button onclick="startScan()">Scan Parcel</button>
+img{width:100%;margin-top:10px;border-radius:6px}
+video{display:none;width:100%}
+</style></head><body><div id="map"></div><div id="floatingRoute">
+<b>Today's Route</b>
+<div id="progress"></div>
+<div id="todayRoute"></div>
+</div><div class="panel"><input id="name" placeholder="Customer Name / Scan">
+<input id="address" placeholder="Address">
+<input id="notes" placeholder="Notes (gate color, landmark etc)"><button onclick="startScan()">Scan Parcel</button>
 <button onclick="addParcel()">Add Parcel</button>
 <button onclick="lockLocation()">Lock Location</button>
-<button onclick="checkSaved()">Check Saved Location</button>
-<button onclick="openGoogle()">Open Google Maps</button>
-<button onclick="capturePhoto()">Capture Gate Photo</button>
+<button onclick="checkSaved()">Check Saved</button>
+<button onclick="openGoogle()">Navigate (Google Maps)</button>
+<button onclick="capturePhoto()">Gate Photo</button>
+<button onclick="exportData()">Export Data</button>
 
-<div id="reader"></div><div id="parcelList"></div>
+<input type="file" onchange="importData(this)"><div id="reader"></div>
+<div id="parcelList"></div>
 <div id="distance"></div><video id="camera" autoplay></video>
 <canvas id="canvas" style="display:none"></canvas>
 <img id="preview">
 
 </div><script>
 
-let map=L.map('map').setView([20.5937,78.9629],5);
+let map=L.map('map').setView([20.5937,78.9629],5)
 
-L.tileLayer(
-'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
-).addTo(map);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png')
+.addTo(map)
 
-let currentLat,currentLon;
-let marker;
+let currentLat,currentLon,currentAccuracy
+let marker
+let parcelMarkers=[]
+let routeLine
 
 navigator.geolocation.watchPosition(pos=>{
-
-currentLat=pos.coords.latitude;
-currentLon=pos.coords.longitude;
-
-map.setView([currentLat,currentLon],16);
-
-});
+currentLat=pos.coords.latitude
+currentLon=pos.coords.longitude
+currentAccuracy=pos.coords.accuracy
+map.setView([currentLat,currentLon],16)
+})
 
 function startScan(){
 
-const scanner=new Html5Qrcode("reader");
+const scanner=new Html5Qrcode("reader")
 
 scanner.start(
 {facingMode:"environment"},
 {fps:10,qrbox:250},
 (decodedText)=>{
-
-document.getElementById("name").value=decodedText;
-
-scanner.stop();
-
-}
-);
+document.getElementById("name").value=decodedText
+scanner.stop()
+})
 
 }
 
+function addParcel(){
+
+let name=nameInput().value
+let address=addressInput().value
+let notes=notesInput().value
+
+let parcel={
+name,address,notes,
+lat:currentLat,
+lon:currentLon,
+date:new Date().toDateString(),
+delivered:false
+}
+
+let list=getParcels()
+list.push(parcel)
+
+saveParcels(list)
+
+renderList()
+renderTodayRoute()
+drawRoute()
+
+showParcelOnMap(parcel)
+
+}
+
+function nameInput(){return document.getElementById("name")}
+function addressInput(){return document.getElementById("address")}
+function notesInput(){return document.getElementById("notes")}
+
+function getParcels(){
+return JSON.parse(localStorage.getItem("parcels"))||[]
+}
+
+function saveParcels(data){
+localStorage.setItem("parcels",JSON.stringify(data))
+}
+
+function renderList(){
+
+let list=getParcels()
+let html=""
+
+list.forEach((p,i)=>{
+
+html+=`<div class="parcel">
+<b>${p.name}</b><br>
+${p.address}<br>
+<i>${p.notes||""}</i><br>
+<button onclick="markDelivered(${i})">Delivered</button>
+</div>`
+
+})
+
+document.getElementById("parcelList").innerHTML=html
+
+}
+
+function renderTodayRoute(){
+
+let list=getParcels()
+let today=new Date().toDateString()
+
+let html=""
+let total=0
+let done=0
+
+list.forEach((p,i)=>{
+
+if(p.date===today){
+
+total++
+if(p.delivered) done++
+
+html+=`<div>
+<b>${p.name}</b><br>
+<small>${p.notes||""}</small>
+</div>`
+
+}
+
+})
+
+document.getElementById("todayRoute").innerHTML=html
+document.getElementById("progress").innerHTML=
+"Progress: "+done+" / "+total
+
+}
+
+function markDelivered(i){
+
+let list=getParcels()
+list[i].delivered=true
+saveParcels(list)
+
+renderList()
+renderTodayRoute()
+
+}
+
+function showParcelOnMap(p){
+
+let m=L.marker([p.lat,p.lon])
+.addTo(map)
+.bindPopup(p.name)
+
+parcelMarkers.push(m)
+
+}
+
+function drawRoute(){
+
+let list=getParcels()
+let today=new Date().toDateString()
+
+let coords=[]
+
+list.forEach(p=>{
+if(p.date===today){
+coords.push([p.lat,p.lon])
+}
+})
+
+if(routeLine) map.removeLayer(routeLine)
+
+if(coords.length>1){
+
+routeLine=L.polyline(coords,{color:'cyan'})
+.addTo(map)
+
+}
+
+}
+
+function lockLocation(){
+
+if(currentAccuracy>20){
+
+alert("GPS accuracy low, wait few seconds")
+return
+
+}
+
+let name=nameInput().value
+let address=addressInput().value
+
+let data={lat:currentLat,lon:currentLon}
+
+localStorage.setItem(name+address,JSON.stringify(data))
+
+alert("Location Locked")
+
+}
+
+function checkSaved(){
+
+let name=nameInput().value
+let address=addressInput().value
+
+let data=localStorage.getItem(name+address)
+
+if(data){
+
+let d=JSON.parse(data)
+
+showMarker(d.lat,d.lon)
+
+map.setView([d.lat,d.lon],18)
+
+calcDistance(d.lat,d.lon)
+
+}else{
+
+alert("No saved location")
+
+}
+
+}
+
+function showMarker(lat,lon){
+
+if(marker) map.removeLayer(marker)
+
+marker=L.marker([lat,lon]).addTo(map)
+
+}
+
+function calcDistance(lat,lon){
+
+let R=6371e3
+
+let φ1=currentLat*Math.PI/180
+let φ2=lat*Math.PI/180
+
+let Δφ=(lat-currentLat)*Math.PI/180
+let Δλ=(lon-currentLon)*Math.PI/180
+
+let a=Math.sin(Δφ/2)*Math.sin(Δφ/2)+
+Math.cos(φ1)*Math.cos(φ2)*
+Math.sin(Δλ/2)*Math.sin(Δλ/2)
+
+let c=2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a))
+let d=R*c
+
+document.getElementById("distance").innerText=
+"Distance: "+Math.round(d)+" meters"
+
+}
+
+function openGoogle(){
+
+let name=nameInput().value
+let address=addressInput().value
+
+let data=localStorage.getItem(name+address)
+
+let lat=currentLat
+let lon=currentLon
+
+if(data){
+
+let d=JSON.parse(data)
+lat=d.lat
+lon=d.lon
+
+}
+
+window.open(
+`https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}`
+)
+
+}
+
+async function capturePhoto(){
+
+let video=document.getElementById("camera")
+video.style.display="block"
+
+let stream=await navigator.mediaDevices.getUserMedia({video:true})
+video.srcObject=stream
+
+setTimeout(()=>{
+
+let canvas=document.getElementById("canvas")
+
+canvas.width=video.videoWidth
+canvas.height=video.videoHeight
+
+let ctx=canvas.getContext("2d")
+ctx.drawImage(video,0,0)
+
+let img=canvas.toDataURL("image/png")
+document.getElementById("preview").src=img
+
+stream.getTracks().forEach(t=>t.stop())
+video.style.display="none"
+
+},2500)
+
+}
+
+function exportData(){
+
+let data=localStorage.getItem("parcels")
+
+let blob=new Blob([data],{type:"application/json"})
+
+let a=document.createElement("a")
+a.href=URL.createObjectURL(blob)
+a.download="speeddrop_backup.json"
+a.click()
+
+}
+
+function importData(input){
+
+let file=input.files[0]
+let reader=new FileReader()
+
+reader.onload=function(){
+
+localStorage.setItem("parcels",reader.result)
+
+renderList()
+renderTodayRoute()
+drawRoute()
+
+}
+
+reader.readAsText(file)
+
+}
+
+renderList()
+renderTodayRoute()
+drawRoute()
+
+</script></body>
+</html>
 function addParcel(){
 
 let name=document.getElementById("name").value;
