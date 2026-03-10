@@ -1,8 +1,71 @@
-body { margin:0; font-family:Arial; background:#111; color:#fff; }
-header { background:#0f62fe; padding:12px; text-align:center; font-size:18px; }
-#map { height:50vh; }
-.panel { padding:10px; }
-input { width:70%; padding:8px; }
-button { padding:8px; background:#0f62fe; color:#fff; border:none; }
-ul { list-style:none; padding:0; }
-li { padding:6px 0; border-bottom:1px solid #333; }
+body{
+margin:0;
+font-family:Arial;
+background:#0f172a;
+color:white
+}
+
+header{
+padding:10px
+}
+
+.stats{
+display:flex;
+gap:10px
+}
+
+.card{
+flex:1;
+background:#1f2937;
+padding:10px;
+border-radius:10px;
+text-align:center
+}
+
+#map{
+height:40vh
+}
+
+.controls{
+display:flex;
+gap:10px;
+padding:10px
+}
+
+button{
+padding:10px;
+border:none;
+border-radius:6px;
+background:#2563eb;
+color:white
+}
+
+#parcelList{
+padding:10px
+}
+
+.parcel{
+background:#1f2937;
+padding:10px;
+margin:5px 0;
+border-radius:10px
+}
+
+.parcel img{
+width:100%;
+border-radius:6px
+}
+
+#cameraBox{
+display:none;
+position:fixed;
+bottom:0;
+left:0;
+right:0;
+background:#000;
+padding:10px
+}
+
+#video{
+width:100%
+}
