@@ -1,9 +1,8 @@
 {
-  "name": "SpeedDrop",
-  "short_name": "SpeedDrop",
-  "start_url": "index.html",
-  "display": "standalone",
-  "background_color": "#111111",
-  "theme_color": "#0f62fe",
-  "icons": []
+"name": "SpeedDrop",
+"short_name": "SpeedDrop",
+"display": "standalone",
+"start_url": "./",
+"background_color": "#0f172a",
+"theme_color": "#0f172a"
 }
