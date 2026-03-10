@@ -1,319 +1,47 @@
+cript></body>
+</html>
 <!DOCTYPE html><html>
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SpeedDrop</title><link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css">
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-<script src="https://unpkg.com/html5-qrcode"></script><style>
+<head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0"><title>SpeedDrop</title><link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="style.css"><link rel="stylesheet"
+href="https://unpkg.com/leaflet/dist/leaflet.css"/><script src="https://unpkg.com/leaflet/dist/leaflet.js"></script><script src="https://unpkg.com/html5-qrcode"></script></head><body><header><h1>⚡ SpeedDrop</h1><div class="stats"><div class="card">
+<h2 id="totalCount">0</h2>
+<p>Total</p>
+</div><div class="card">
+<h2 id="pendingCount">0</h2>
+<p>Pending</p>
+</div><div class="card">
+<h2 id="doneCount">0</h2>
+<p>Done</p>
+</div><div class="card">
+<h2 id="photoCount">0</h2>
+<p>Photos</p>
+</div></div></header><div id="map"></div><div class="controls"><button onclick="startScan()">📷 Scan</button>
 
-body{
-margin:0;
-font-family:Arial;
-background:#0f172a;
-color:white;
-}
+<button onclick="addParcel()">➕ Add</button>
 
-#map{
-height:45vh;
-}
+<button onclick="exportData()">💾 Export</button>
 
-.panel{
-background:#111827;
-padding:12px;
-}
+<button onclick="document.getElementById('importFile').click()">📂 Import</button>
 
-input,button{
-width:100%;
-padding:10px;
-margin:5px 0;
-border:none;
-border-radius:6px;
-}
+<input type="file"
+id="importFile"
+style="display:none"
+onchange="importData(this)">
 
-button{
-background:#2563eb;
-color:white;
-}
+</div><div id="reader"></div><div id="parcelList"></div><div id="cameraBox"><video id="video"
+autoplay
+playsinline></video>
 
-.parcel{
-background:#1f2937;
-padding:10px;
-margin:6px 0;
-border-radius:8px;
-}
+<button onclick="captureNow()">Capture Photo</button>
 
-.parcel img{
-width:100%;
-border-radius:6px;
-margin-top:6px;
-}
+</div><script src="storage.js"></script><script src="map.js"></script><script src="scan.js"></script><script src="camera.js"></script><script src="app.js"></script><script>
 
-.btnSmall{
-width:48%;
-display:inline-block;
-}
+if('serviceWorker' in navigator){
 
-#floatingRoute{
-position:fixed;
-top:10px;
-right:10px;
-width:220px;
-max-height:350px;
-overflow:auto;
-background:#111827;
-padding:10px;
-border-radius:8px;
-}
-
-</style></head><body><div id="map"></div><div id="floatingRoute">
-<b>Today's Route</b>
-<div id="progress"></div>
-<div id="todayRoute"></div>
-</div><div class="panel"><input id="name" placeholder="Customer Name">
-<input id="address" placeholder="Address">
-<input id="notes" placeholder="Notes"><button onclick="startScan()">Scan Parcel</button>
-<button onclick="addParcel()">Add Parcel</button>
-
-<button onclick="exportData()">Export Data</button>
-<button onclick="document.getElementById('importFile').click()">Import Data</button>
-
-<input type="file" id="importFile" style="display:none" onchange="importData(this)"><div id="reader"></div>
-<div id="parcelList"></div></div><script>
-
-let map=L.map('map').setView([20.5937,78.9629],5)
-
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map)
-
-let currentLat,currentLon,currentMarker
-
-navigator.geolocation.watchPosition(pos=>{
-
-currentLat=pos.coords.latitude
-currentLon=pos.coords.longitude
-
-map.setView([currentLat,currentLon],16)
-
-if(currentMarker) map.removeLayer(currentMarker)
-
-currentMarker=L.circleMarker([currentLat,currentLon],{
-radius:8,
-color:"cyan"
-}).addTo(map).bindPopup("You are here")
-
-})
-
-function getParcels(){
-return JSON.parse(localStorage.getItem("parcels"))||[]
-}
-
-function saveParcels(data){
-localStorage.setItem("parcels",JSON.stringify(data))
-}
-
-function addParcel(){
-
-let name=document.getElementById("name").value
-let address=document.getElementById("address").value
-let notes=document.getElementById("notes").value
-
-let parcel={
-name,address,notes,
-lat:currentLat,
-lon:currentLon,
-date:new Date().toDateString(),
-photo:"",
-delivered:false
-}
-
-let list=getParcels()
-list.push(parcel)
-
-saveParcels(list)
-
-renderList()
-renderToday()
+navigator.serviceWorker.register('sw.js')
 
 }
-
-function renderList(){
-
-let list=getParcels()
-let html=""
-
-list.forEach((p,i)=>{
-
-html+=`
-<div class="parcel">
-<b>${p.name}</b><br>
-${p.address}<br>
-<i>${p.notes||""}</i>
-
-${p.photo ? `<img src="${p.photo}">` : ""}
-
-<br>
-
-<button class="btnSmall" onclick="editParcel(${i})">Edit</button>
-<button class="btnSmall" onclick="deleteParcel(${i})">Delete</button>
-
-<button onclick="takePhoto(${i})">Gate Photo</button>
-<button onclick="navigate(${i})">Navigate</button>
-
-</div>
-`
-
-})
-
-document.getElementById("parcelList").innerHTML=html
-
-}
-
-function editParcel(i){
-
-let list=getParcels()
-
-let n=prompt("Name",list[i].name)
-let a=prompt("Address",list[i].address)
-let no=prompt("Notes",list[i].notes)
-
-list[i].name=n
-list[i].address=a
-list[i].notes=no
-
-saveParcels(list)
-renderList()
-
-}
-
-function deleteParcel(i){
-
-let list=getParcels()
-
-list.splice(i,1)
-
-saveParcels(list)
-
-renderList()
-renderToday()
-
-}
-
-function renderToday(){
-
-let list=getParcels()
-
-let today=new Date().toDateString()
-
-let html=""
-let total=0
-
-list.forEach(p=>{
-
-if(p.date===today){
-
-total++
-
-html+=`<div><b>${p.name}</b><br>${p.notes||""}</div>`
-
-}
-
-})
-
-document.getElementById("todayRoute").innerHTML=html
-document.getElementById("progress").innerHTML="Today Parcels: "+total
-
-}
-
-function navigate(i){
-
-let p=getParcels()[i]
-
-window.open(
-`https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lon}`
-)
-
-}
-
-async function takePhoto(i){
-
-let stream=await navigator.mediaDevices.getUserMedia({video:true})
-
-let video=document.createElement("video")
-video.srcObject=stream
-video.play()
-
-setTimeout(()=>{
-
-let canvas=document.createElement("canvas")
-canvas.width=video.videoWidth
-canvas.height=video.videoHeight
-
-let ctx=canvas.getContext("2d")
-ctx.drawImage(video,0,0)
-
-let img=canvas.toDataURL()
-
-let list=getParcels()
-
-list[i].photo=img
-
-saveParcels(list)
-
-stream.getTracks().forEach(t=>t.stop())
-
-renderList()
-
-},2000)
-
-}
-
-function startScan(){
-
-const scanner=new Html5Qrcode("reader")
-
-scanner.start(
-{facingMode:"environment"},
-{fps:10,qrbox:250},
-(decodedText)=>{
-document.getElementById("name").value=decodedText
-scanner.stop()
-})
-
-}
-
-function exportData(){
-
-let data=localStorage.getItem("parcels")
-
-let blob=new Blob([data],{type:"application/json"})
-
-let a=document.createElement("a")
-
-a.href=URL.createObjectURL(blob)
-a.download="speeddrop_backup.json"
-a.click()
-
-}
-
-function importData(input){
-
-let file=input.files[0]
-let reader=new FileReader()
-
-reader.onload=function(){
-
-localStorage.setItem("parcels",reader.result)
-
-renderList()
-renderToday()
-
-}
-
-reader.readAsText(file)
-
-}
-
-renderList()
-renderToday()
 
 </script></body>
 </html>
