@@ -1,56 +1,36 @@
-function getParcels(){
+function saveParcel(code,lat,lng){
 
-return JSON.parse(
-localStorage.getItem("parcels")
-)||[]
+let parcels = JSON.parse(localStorage.getItem("parcels")||"[]")
 
-}
+parcels.push({
+code:code,
+lat:lat,
+lng:lng,
+time:Date.now()
+})
 
-function saveParcels(data){
+localStorage.setItem("parcels",JSON.stringify(parcels))
 
-localStorage.setItem(
-"parcels",
-JSON.stringify(data)
-)
-
-}
-
-function exportData(){
-
-let data=localStorage.getItem("parcels")
-
-let blob=new Blob(
-[data],
-{type:"application/json"}
-)
-
-let a=document.createElement("a")
-
-a.href=URL.createObjectURL(blob)
-
-a.download="speeddrop_backup.json"
-
-a.click()
+renderParcels()
 
 }
 
-function importData(input){
+function renderParcels(){
 
-let file=input.files[0]
+let list=document.getElementById("parcelList")
 
-let reader=new FileReader()
+list.innerHTML=""
 
-reader.onload=function(){
+let parcels=JSON.parse(localStorage.getItem("parcels")||"[]")
 
-localStorage.setItem(
-"parcels",
-reader.result
-)
+parcels.forEach((p,i)=>{
 
-renderList()
+let li=document.createElement("li")
 
-}
+li.innerText="Parcel "+(i+1)+" : "+p.code
 
-reader.readAsText(file)
+list.appendChild(li)
+
+})
 
 }
