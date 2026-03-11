@@ -1,22 +1,14 @@
-let map=L.map('map')
-.setView([20.5937,78.9629],5)
+let map
+
+function initMap(){
+
+map=L.map('map').setView([20.5937,78.9629],5)
 
 L.tileLayer(
-'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+{maxZoom:19}
 ).addTo(map)
 
-let currentLat
-let currentLon
+}
 
-navigator.geolocation.watchPosition(pos=>{
-
-currentLat=pos.coords.latitude
-
-currentLon=pos.coords.longitude
-
-map.setView(
-[currentLat,currentLon],
-16
-)
-
-})
+window.onload=initMap
